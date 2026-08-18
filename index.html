@@ -64,12 +64,23 @@ dialog h3{margin:0 0 12px}
 .check{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
 .check input{width:auto}
 .notice{font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:14px}
+.acct{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
+.dot.on{background:var(--accent2);box-shadow:0 0 6px var(--accent2)}
+.dot.off{background:var(--warn)}
+.dot.err{background:var(--danger)}
+#gate{position:fixed;inset:0;background:var(--bg);z-index:20;display:none;align-items:center;justify-content:center;padding:20px}
+#gate.show{display:flex}
+#gate .box{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:28px;max-width:420px;width:100%;text-align:center}
+#gate h2{margin:0 0 6px}#gate p{color:var(--muted);font-size:14px}
+#gate .btn{width:100%;margin-top:10px;padding:12px}
 @media(max-width:600px){header{padding:12px 14px}main{padding:12px}.stat .v{font-size:22px}}
 </style>
 </head>
 <body>
 <header>
   <h1>🖨️ Print Hours <span>work-use tracker</span></h1>
+  <div class="acct" id="acct"><span class="dot" id="sync-dot"></span><span id="sync-txt">Local only</span><span id="acct-email"></span><button class="btn sec sm" id="b-signout" style="display:none">Sign out</button></div>
   <nav>
     <button data-v="log" class="active">Log</button>
     <button data-v="jobs">Print Jobs</button>
@@ -175,7 +186,7 @@ dialog h3{margin:0 0 12px}
   </div>
   <div class="card">
     <h2>Data & backup</h2>
-    <div class="notice">Data lives in <b>this browser</b> on <b>this device</b> (localStorage) — GitHub Pages can't store anything server-side. Export a backup regularly, and import it on another device to move your data over.</div>
+    <div class="notice" id="data-notice">Data syncs to Firestore under your Google account and works offline (changes upload when you reconnect). Export a JSON backup occasionally anyway.</div>
     <div class="actions">
       <button class="btn" id="b-export">Export backup (JSON)</button>
       <button class="btn sec" id="b-import">Import backup</button>
@@ -187,6 +198,13 @@ dialog h3{margin:0 0 12px}
 </section>
 </main>
 
+<div id="gate"><div class="box">
+  <div style="font-size:40px">🖨️</div><h2>Print Hours</h2>
+  <p>Sign in with Google to sync your prints across devices.</p>
+  <button class="btn" id="b-google">Sign in with Google</button>
+  <p id="gate-err" style="color:var(--danger);display:none"></p>
+  <p style="font-size:12px;margin-top:14px">Only your account can read your data.</p>
+</div></div>
 <dialog id="dlg">
   <h3 id="d-title">Edit</h3>
   <div id="d-body"></div>
@@ -197,16 +215,69 @@ dialog h3{margin:0 0 12px}
 </dialog>
 <div class="toast" id="toast"></div>
 
-<script>
+<script type="module">
+import { firebaseConfig } from "./firebase-config.js";
 // ---------- state ----------
 const KEY='printhours.v1';
 const $=s=>document.querySelector(s);
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36);
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
-let S=load();
-function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.entries)return s}catch(e){}
-  return {settings:{rate:2,gram:0.025,printer:''},jobs:[],entries:[]}}
-function save(){localStorage.setItem(KEY,JSON.stringify(S));render()}
+const DEFAULTS=()=>({settings:{rate:2,gram:0.025,printer:''},jobs:[],entries:[]});
+const CLOUD=!!(firebaseConfig&&firebaseConfig.apiKey&&!/^PASTE/.test(firebaseConfig.apiKey));
+const LOCAL0=loadLocal(); // pre-cloud data, used for one-time migration
+let S=CLOUD?DEFAULTS():LOCAL0;
+function loadLocal(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.entries)return s}catch(e){}return DEFAULTS()}
+// save() is the single persistence entry point. UI code mutates S then calls save().
+function save(){render();if(CLOUD)cloud.push();else localStorage.setItem(KEY,JSON.stringify(S))}
+
+/* ---------- Firestore sync ----------
+   users/{uid}/entries/{id}, users/{uid}/jobs/{id}, users/{uid}/meta/settings
+   push() diffs S against the last snapshot and writes only what changed. */
+const cloud={last:{entries:{},jobs:{},settings:''},ready:false,user:null,db:null,fb:null,
+  async init(){
+    const [{initializeApp},fs,au]=await Promise.all([
+      import("https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js"),
+      import("https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js"),
+      import("https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js")]);
+    this.fb={...fs,...au};
+    const app=initializeApp(firebaseConfig);
+    this.db=fs.initializeFirestore(app,{localCache:fs.persistentLocalCache({tabManager:fs.persistentSingleTabManager({})})});
+    const auth=au.getAuth(app);this.auth=auth;
+    au.setPersistence(auth,au.browserLocalPersistence).catch(()=>{});
+    $('#b-google').onclick=async()=>{$('#gate-err').style.display='none';
+      try{await au.signInWithPopup(auth,new au.GoogleAuthProvider())}
+      catch(e){if(/popup/i.test(e.code))au.signInWithRedirect(auth,new au.GoogleAuthProvider());else{$('#gate-err').textContent=e.message;$('#gate-err').style.display=''}}};
+    $('#b-signout').onclick=()=>au.signOut(auth);
+    au.onAuthStateChanged(auth,u=>{this.user=u;
+      if(!u){$('#gate').classList.add('show');$('#b-signout').style.display='none';$('#acct-email').textContent='';setStatus('off','Signed out');this.unsub();S=DEFAULTS();render();return}
+      $('#gate').classList.remove('show');$('#b-signout').style.display='';$('#acct-email').textContent=u.email;setStatus('off','Connecting…');this.subscribe()});
+  },
+  _unsubs:[],unsub(){this._unsubs.forEach(f=>f());this._unsubs=[];this.ready=false;this.last={entries:{},jobs:{},settings:''}},
+  col(n){return this.fb.collection(this.db,'users',this.user.uid,n)},
+  subscribe(){this.unsub();const {onSnapshot,doc}=this.fb;let got={e:false,j:false,s:false};
+    const done=()=>{if(got.e&&got.j&&got.s&&!this.ready){this.ready=true;this.migrate()}};
+    const afterSnap=snap=>{const meta=snap.metadata||{};setStatus(meta.hasPendingWrites?'off':'on',meta.hasPendingWrites?'Saving…':(meta.fromCache?'Offline (cached)':'Synced'));render()};
+    const err=e=>setStatus('err',/permission/i.test(e.code)?'Blocked by rules':'Error');
+    this._unsubs.push(onSnapshot(this.col('entries'),snap=>{S.entries=snap.docs.map(d=>({id:d.id,...d.data()}));this.last.entries=Object.fromEntries(S.entries.map(e=>[e.id,JSON.stringify(e)]));got.e=true;done();afterSnap(snap)},err));
+    this._unsubs.push(onSnapshot(this.col('jobs'),snap=>{S.jobs=snap.docs.map(d=>({id:d.id,...d.data()}));this.last.jobs=Object.fromEntries(S.jobs.map(e=>[e.id,JSON.stringify(e)]));got.j=true;done();afterSnap(snap)},err));
+    this._unsubs.push(onSnapshot(doc(this.db,'users',this.user.uid,'meta','settings'),snap=>{if(snap.exists())S.settings={...DEFAULTS().settings,...snap.data()};this.last.settings=JSON.stringify(S.settings);got.s=true;done();afterSnap(snap)},err));
+  },
+  // First sign-in on a device that already had local-only data: offer to upload it.
+  migrate(){const loc=LOCAL0;const empty=!S.entries.length&&!S.jobs.length;
+    if(empty&&(loc.entries.length||loc.jobs.length)&&!localStorage.getItem(KEY+'.migrated')){
+      if(confirm(`Upload ${loc.entries.length} local print(s) and ${loc.jobs.length} job(s) to your account?`)){S=loc;this.push()}}
+    localStorage.setItem(KEY+'.migrated','1')},
+  push(){if(!this.user||!this.ready)return;const {writeBatch,doc,deleteDoc}=this.fb;const b=writeBatch(this.db);let n=0;
+    const clean=o=>JSON.parse(JSON.stringify(o));
+    for(const [name,list] of [['entries',S.entries],['jobs',S.jobs]]){const seen={};
+      list.forEach(e=>{const j=JSON.stringify(e);seen[e.id]=1;if(this.last[name][e.id]!==j){b.set(doc(this.col(name),e.id),clean(e));n++}});
+      Object.keys(this.last[name]).forEach(id=>{if(!seen[id]){b.delete(doc(this.col(name),id));n++}});}
+    const sj=JSON.stringify(S.settings);if(this.last.settings!==sj){b.set(doc(this.db,'users',this.user.uid,'meta','settings'),clean(S.settings));n++}
+    if(n){setStatus('off','Saving…');b.commit().catch(e=>{console.error(e);setStatus('err','Save failed')})}}
+};
+function setStatus(cls,txt){$('#sync-dot').className='dot '+cls;$('#sync-txt').textContent=txt}
+if(CLOUD)cloud.init().catch(e=>{console.error(e);setStatus('err','Firebase init failed')});
+else{$('#data-notice').innerHTML='<b>Local-only mode:</b> firebase-config.js has no project config yet, so data lives in this browser only. Fill in firebase-config.js to enable sync.';}
 const money=n=>'$'+(Math.round(n*100)/100).toFixed(2);
 const hrs=n=>(Math.round(n*100)/100).toString().replace(/\.?0+$/,'')||'0';
 const fmtDate=d=>{const [y,m,dd]=d.split('-');return `${m}/${dd}/${y.slice(2)}`};
@@ -347,7 +418,7 @@ $('#f-import').onchange=ev=>{const f=ev.target.files[0];if(!f)return;const r=new
   r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.entries||!d.jobs)throw 0;
     if(!confirm(`Import ${d.entries.length} entries and ${d.jobs.length} jobs? This replaces current data.`))return;S=d;save();toast('Imported')}catch(e){toast('Invalid backup file')}};
   r.readAsText(f);ev.target.value=''};
-$('#b-wipe').onclick=()=>{if(confirm('Erase ALL data? Export a backup first!')&&confirm('Really erase everything?')){localStorage.removeItem(KEY);S=load();save()}};
+$('#b-wipe').onclick=()=>{if(confirm('Erase ALL data? Export a backup first!')&&confirm('Really erase everything?')){S=DEFAULTS();save()}};
 function dl(name,content,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 
 // ---------- dialog ----------
