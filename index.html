@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Print Hours</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖨️</text></svg>">
+<style>
+:root{
+  --bg:#0f1115;--panel:#171a21;--panel2:#1e222b;--border:#2a2f3a;--text:#e6e8ee;--muted:#8b93a7;
+  --accent:#4f8cff;--accent2:#7bd88f;--warn:#ffb454;--danger:#ff6b6b;--radius:12px;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.45}
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--border);background:var(--panel);position:sticky;top:0;z-index:5;flex-wrap:wrap;gap:10px}
+header h1{margin:0;font-size:20px;letter-spacing:.3px}
+header h1 span{color:var(--muted);font-weight:400;font-size:13px;margin-left:8px}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+nav button{background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:14px}
+nav button.active{background:var(--panel2);color:var(--text);border-color:var(--border)}
+nav button:hover{color:var(--text)}
+main{max-width:1100px;margin:0 auto;padding:20px}
+.view{display:none}.view.active{display:block}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:20px}
+.stat{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+.stat .l{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+.stat .v{font-size:26px;font-weight:600;margin-top:4px}
+.stat .s{font-size:12px;color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:18px}
+.card h2{margin:0 0 12px;font-size:16px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.field{display:flex;flex-direction:column;gap:4px;flex:1;min-width:130px}
+.field label{font-size:12px;color:var(--muted)}
+input,select,textarea{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 10px;border-radius:8px;font-size:14px;width:100%;font-family:inherit}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+button.btn{background:var(--accent);color:#fff;border:none;padding:9px 16px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;white-space:nowrap}
+button.btn:hover{filter:brightness(1.1)}
+button.btn.sec{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
+button.btn.ok{background:var(--accent2);color:#0b1a10}
+button.btn.dg{background:transparent;color:var(--danger);border:1px solid var(--border)}
+button.btn.sm{padding:5px 10px;font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:9px 8px;text-align:left;border-bottom:1px solid var(--border);vertical-align:middle}
+th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:500}
+tr.done td{opacity:.5}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;background:var(--panel2);border:1px solid var(--border);color:var(--muted)}
+.tag.ok{color:var(--accent2);border-color:#2f5a3a}
+.tag.pend{color:var(--warn);border-color:#5a4520}
+.jobs{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.job{background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;display:flex;flex-direction:column;gap:8px}
+.job .n{font-weight:600;font-size:15px}
+.job .m{font-size:12px;color:var(--muted)}
+.job .a{display:flex;gap:6px;margin-top:auto;flex-wrap:wrap}
+.muted{color:var(--muted);font-size:13px}
+.empty{color:var(--muted);text-align:center;padding:24px;font-size:14px}
+.tw{overflow-x:auto}
+.actions{display:flex;gap:6px;flex-wrap:wrap}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--border);padding:10px 16px;border-radius:8px;font-size:14px;opacity:0;transition:.2s;pointer-events:none;z-index:9}
+.toast.show{opacity:1}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:20px;max-width:460px;width:92%}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+dialog h3{margin:0 0 12px}
+.check{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.check input{width:auto}
+.notice{font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:14px}
+@media(max-width:600px){header{padding:12px 14px}main{padding:12px}.stat .v{font-size:22px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🖨️ Print Hours <span>work-use tracker</span></h1>
+  <nav>
+    <button data-v="log" class="active">Log</button>
+    <button data-v="jobs">Print Jobs</button>
+    <button data-v="report">Reimbursement</button>
+    <button data-v="settings">Settings</button>
+  </nav>
+</header>
+
+<main>
+<!-- ============ LOG ============ -->
+<section class="view active" id="v-log">
+  <div class="stats">
+    <div class="stat"><div class="l">Total hours</div><div class="v" id="s-hours">0</div><div class="s" id="s-prints">0 prints</div></div>
+    <div class="stat"><div class="l">Owed (unpaid)</div><div class="v" id="s-owed">$0</div><div class="s" id="s-owed-h">0 h unpaid</div></div>
+    <div class="stat"><div class="l">This month</div><div class="v" id="s-month">0 h</div><div class="s" id="s-month-d">$0</div></div>
+    <div class="stat"><div class="l">Reimbursed to date</div><div class="v" id="s-paid">$0</div><div class="s" id="s-paid-h">0 h</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Log a print</h2>
+    <div class="row">
+      <div class="field" style="flex:2"><label>Print job</label>
+        <select id="f-job"><option value="">— pick a saved job or type below —</option></select></div>
+      <div class="field" style="flex:2"><label>Or name (new / one-off)</label><input id="f-name" placeholder="e.g. Sensor bracket v3"></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div class="field"><label>Date</label><input type="date" id="f-date"></div>
+      <div class="field"><label>Hours</label><input type="number" id="f-hours" step="0.25" min="0" placeholder="e.g. 4.5"></div>
+      <div class="field"><label>Filament (g)</label><input type="number" id="f-grams" step="1" min="0" placeholder="0"></div>
+      <div class="field"><label>Qty</label><input type="number" id="f-qty" step="1" min="1" value="1"></div>
+      <div class="field" style="flex:2"><label>Notes</label><input id="f-notes" placeholder="optional"></div>
+      <div class="field" style="flex:0"><label>&nbsp;</label><button class="btn" id="b-add">Add</button></div>
+    </div>
+    <div class="check" style="margin-top:8px"><input type="checkbox" id="f-save" checked><label for="f-save">Save new name as a reusable print job</label></div>
+  </div>
+
+  <div class="card">
+    <h2>History <span class="actions"><select id="log-filter"><option value="all">All</option><option value="unpaid">Unpaid</option><option value="paid">Reimbursed</option></select></span></h2>
+    <div class="tw"><table><thead><tr><th>Date</th><th>Print</th><th class="num">Qty</th><th class="num">Hours</th><th class="num">Filament</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead><tbody id="log-body"></tbody></table></div>
+    <div class="empty" id="log-empty">No prints logged yet.</div>
+  </div>
+</section>
+
+<!-- ============ JOBS ============ -->
+<section class="view" id="v-jobs">
+  <div class="card">
+    <h2>New print job</h2>
+    <div class="row">
+      <div class="field" style="flex:2"><label>Name</label><input id="j-name" placeholder="e.g. Cable clip (x10)"></div>
+      <div class="field"><label>Default hours</label><input type="number" id="j-hours" step="0.25" min="0" placeholder="3.5"></div>
+      <div class="field"><label>Filament (g)</label><input type="number" id="j-grams" step="1" min="0" placeholder="0"></div>
+      <div class="field" style="flex:2"><label>Notes</label><input id="j-notes" placeholder="material, settings, purpose…"></div>
+      <div class="field" style="flex:0"><label>&nbsp;</label><button class="btn" id="b-addjob">Save job</button></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Saved jobs <span class="muted">Click <b>Reprint</b> to log it again today</span></h2>
+    <div class="jobs" id="jobs-grid"></div>
+    <div class="empty" id="jobs-empty">No saved jobs yet. Add one above, or log a print with "save as reusable job" checked.</div>
+  </div>
+</section>
+
+<!-- ============ REPORT ============ -->
+<section class="view" id="v-report">
+  <div class="card">
+    <h2>Reimbursement report</h2>
+    <div class="row">
+      <div class="field"><label>From</label><input type="date" id="r-from"></div>
+      <div class="field"><label>To</label><input type="date" id="r-to"></div>
+      <div class="field"><label>Include</label><select id="r-status"><option value="unpaid">Unpaid only</option><option value="all">All</option><option value="paid">Reimbursed only</option></select></div>
+      <div class="field" style="flex:0"><label>&nbsp;</label><button class="btn sec" id="b-thismonth">This month</button></div>
+      <div class="field" style="flex:0"><label>&nbsp;</label><button class="btn sec" id="b-lastmonth">Last month</button></div>
+      <div class="field" style="flex:0"><label>&nbsp;</label><button class="btn sec" id="b-alltime">All time</button></div>
+    </div>
+    <div class="stats" style="margin-top:16px">
+      <div class="stat"><div class="l">Prints</div><div class="v" id="r-count">0</div></div>
+      <div class="stat"><div class="l">Hours</div><div class="v" id="r-hours">0</div><div class="s" id="r-hours-d">$0 machine time</div></div>
+      <div class="stat"><div class="l">Filament</div><div class="v" id="r-grams">0 g</div><div class="s" id="r-grams-d">$0 material</div></div>
+      <div class="stat"><div class="l">Total due</div><div class="v" id="r-total">$0</div></div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="b-csv">Download CSV</button>
+      <button class="btn sec" id="b-copy">Copy summary text</button>
+      <button class="btn ok" id="b-markpaid">Mark these as reimbursed</button>
+    </div>
+    <div class="tw" style="margin-top:14px"><table><thead><tr><th>Date</th><th>Print</th><th class="num">Qty</th><th class="num">Hours</th><th class="num">Filament</th><th class="num">Amount</th><th>Status</th></tr></thead><tbody id="r-body"></tbody></table></div>
+    <div class="empty" id="r-empty">Nothing in this range.</div>
+  </div>
+</section>
+
+<!-- ============ SETTINGS ============ -->
+<section class="view" id="v-settings">
+  <div class="card">
+    <h2>Rates</h2>
+    <div class="notice">Amount per print = hours × hourly rate + filament grams × cost per gram (× qty). Rate changes apply to unpaid entries; reimbursed entries keep the amount they were paid at.</div>
+    <div class="row">
+      <div class="field"><label>Hourly machine rate ($/h)</label><input type="number" id="s-rate" step="0.01" min="0"></div>
+      <div class="field"><label>Filament cost ($/g)</label><input type="number" id="s-gram" step="0.001" min="0"></div>
+      <div class="field"><label>Printer name (for reports)</label><input id="s-printer" placeholder="e.g. Bambu P1S"></div>
+      <div class="field" style="flex:0"><label>&nbsp;</label><button class="btn" id="b-savesettings">Save</button></div>
+    </div>
+    <p class="muted" style="margin:10px 0 0">Tip: a 1kg spool at $25 ≈ $0.025/g. For hourly rate, a common approach is (printer cost ÷ expected lifetime hours) + electricity + wear.</p>
+  </div>
+  <div class="card">
+    <h2>Data & backup</h2>
+    <div class="notice">Data lives in <b>this browser</b> on <b>this device</b> (localStorage) — GitHub Pages can't store anything server-side. Export a backup regularly, and import it on another device to move your data over.</div>
+    <div class="actions">
+      <button class="btn" id="b-export">Export backup (JSON)</button>
+      <button class="btn sec" id="b-import">Import backup</button>
+      <input type="file" id="f-import" accept="application/json" style="display:none">
+      <button class="btn dg" id="b-wipe">Erase all data</button>
+    </div>
+    <p class="muted" id="s-info" style="margin:12px 0 0"></p>
+  </div>
+</section>
+</main>
+
+<dialog id="dlg">
+  <h3 id="d-title">Edit</h3>
+  <div id="d-body"></div>
+  <div class="actions" style="margin-top:14px;justify-content:flex-end">
+    <button class="btn sec" id="d-cancel">Cancel</button>
+    <button class="btn" id="d-ok">Save</button>
+  </div>
+</dialog>
+<div class="toast" id="toast"></div>
+
+<script>
+// ---------- state ----------
+const KEY='printhours.v1';
+const $=s=>document.querySelector(s);
+const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36);
+const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+let S=load();
+function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.entries)return s}catch(e){}
+  return {settings:{rate:2,gram:0.025,printer:''},jobs:[],entries:[]}}
+function save(){localStorage.setItem(KEY,JSON.stringify(S));render()}
+const money=n=>'$'+(Math.round(n*100)/100).toFixed(2);
+const hrs=n=>(Math.round(n*100)/100).toString().replace(/\.?0+$/,'')||'0';
+const fmtDate=d=>{const [y,m,dd]=d.split('-');return `${m}/${dd}/${y.slice(2)}`};
+function amount(e){ if(e.paid&&e.paidAmount!=null) return e.paidAmount;
+  return (e.hours*S.settings.rate + (e.grams||0)*S.settings.gram)*(e.qty||1)}
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1800)}
+
+// ---------- nav ----------
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x===b));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='v-'+b.dataset.v));
+});
+
+// ---------- log ----------
+$('#f-date').value=today();
+$('#f-job').onchange=()=>{const j=S.jobs.find(j=>j.id===$('#f-job').value);if(!j)return;
+  $('#f-name').value='';$('#f-hours').value=j.hours||'';$('#f-grams').value=j.grams||''};
+$('#b-add').onclick=()=>{
+  const jobId=$('#f-job').value, name=$('#f-name').value.trim(), hours=parseFloat($('#f-hours').value);
+  const job=S.jobs.find(j=>j.id===jobId);
+  if(!job&&!name)return toast('Pick a job or enter a name');
+  if(!(hours>0))return toast('Enter hours');
+  let jid=job?job.id:null, jname=job?job.name:name;
+  if(!job&&$('#f-save').checked){
+    const existing=S.jobs.find(j=>j.name.toLowerCase()===name.toLowerCase());
+    if(existing){jid=existing.id;jname=existing.name}
+    else{const nj={id:uid(),name,hours,grams:parseFloat($('#f-grams').value)||0,notes:''};S.jobs.push(nj);jid=nj.id}
+  }
+  S.entries.push({id:uid(),date:$('#f-date').value||today(),jobId:jid,name:jname,hours,
+    grams:parseFloat($('#f-grams').value)||0,qty:parseInt($('#f-qty').value)||1,notes:$('#f-notes').value.trim(),paid:false});
+  ['#f-name','#f-hours','#f-grams','#f-notes'].forEach(s=>$(s).value='');$('#f-qty').value=1;$('#f-job').value='';
+  save();toast('Logged');
+};
+$('#log-filter').onchange=render;
+
+function renderLog(){
+  const f=$('#log-filter').value;
+  const list=S.entries.filter(e=>f==='all'||(f==='paid'?e.paid:!e.paid)).sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+  $('#log-empty').style.display=list.length?'none':'';
+  $('#log-body').innerHTML=list.map(e=>`<tr class="${e.paid?'done':''}">
+    <td>${fmtDate(e.date)}</td><td>${esc(e.name)}${e.notes?`<div class="muted" style="font-size:12px">${esc(e.notes)}</div>`:''}</td>
+    <td class="num">${e.qty||1}</td><td class="num">${hrs(e.hours)}</td><td class="num">${e.grams?e.grams+' g':'—'}</td><td class="num">${money(amount(e))}</td>
+    <td>${e.paid?`<span class="tag ok">Paid ${e.paidDate?fmtDate(e.paidDate):''}</span>`:'<span class="tag pend">Unpaid</span>'}</td>
+    <td><div class="actions">
+      <button class="btn sec sm" data-re="${e.id}" title="Log this print again today">↻ Reprint</button>
+      <button class="btn sec sm" data-ed="${e.id}">Edit</button>
+      <button class="btn sec sm" data-tp="${e.id}">${e.paid?'Unmark':'Mark paid'}</button>
+      <button class="btn dg sm" data-del="${e.id}">✕</button></div></td></tr>`).join('');
+}
+$('#log-body').onclick=ev=>{const b=ev.target.closest('button');if(!b)return;
+  if(b.dataset.re){const e=S.entries.find(x=>x.id===b.dataset.re);
+    S.entries.push({...e,id:uid(),date:today(),paid:false,paidDate:undefined,paidAmount:undefined});save();toast('Reprint logged for today');}
+  if(b.dataset.del){if(confirm('Delete this entry?')){S.entries=S.entries.filter(x=>x.id!==b.dataset.del);save()}}
+  if(b.dataset.tp){const e=S.entries.find(x=>x.id===b.dataset.tp);togglePaid(e);save()}
+  if(b.dataset.ed)editEntry(b.dataset.ed);
+};
+function togglePaid(e){ if(e.paid){e.paid=false;delete e.paidDate;delete e.paidAmount}
+  else{e.paidAmount=amount(e);e.paid=true;e.paidDate=today()} }
+function editEntry(id){const e=S.entries.find(x=>x.id===id);
+  openDlg('Edit print',`
+    <div class="field"><label>Name</label><input id="d-name" value="${esc(e.name)}"></div>
+    <div class="row" style="margin-top:8px"><div class="field"><label>Date</label><input type="date" id="d-date" value="${e.date}"></div>
+    <div class="field"><label>Hours</label><input type="number" step="0.25" id="d-hours" value="${e.hours}"></div></div>
+    <div class="row" style="margin-top:8px"><div class="field"><label>Filament (g)</label><input type="number" id="d-grams" value="${e.grams||0}"></div>
+    <div class="field"><label>Qty</label><input type="number" id="d-qty" value="${e.qty||1}"></div></div>
+    <div class="field" style="margin-top:8px"><label>Notes</label><input id="d-notes" value="${esc(e.notes||'')}"></div>`,
+    ()=>{e.name=$('#d-name').value.trim()||e.name;e.date=$('#d-date').value||e.date;e.hours=parseFloat($('#d-hours').value)||e.hours;
+      e.grams=parseFloat($('#d-grams').value)||0;e.qty=parseInt($('#d-qty').value)||1;e.notes=$('#d-notes').value.trim();save()});
+}
+
+// ---------- jobs ----------
+$('#b-addjob').onclick=()=>{const name=$('#j-name').value.trim();if(!name)return toast('Name required');
+  S.jobs.push({id:uid(),name,hours:parseFloat($('#j-hours').value)||0,grams:parseFloat($('#j-grams').value)||0,notes:$('#j-notes').value.trim()});
+  ['#j-name','#j-hours','#j-grams','#j-notes'].forEach(s=>$(s).value='');save();toast('Job saved')};
+function renderJobs(){
+  const counts={};S.entries.forEach(e=>{if(e.jobId)counts[e.jobId]=(counts[e.jobId]||0)+1});
+  const jobs=[...S.jobs].sort((a,b)=>(counts[b.id]||0)-(counts[a.id]||0)||a.name.localeCompare(b.name));
+  $('#jobs-empty').style.display=jobs.length?'none':'';
+  $('#jobs-grid').innerHTML=jobs.map(j=>`<div class="job">
+    <div class="n">${esc(j.name)}</div>
+    <div class="m">${hrs(j.hours)} h · ${j.grams||0} g · ${money(j.hours*S.settings.rate+(j.grams||0)*S.settings.gram)} each</div>
+    ${j.notes?`<div class="m">${esc(j.notes)}</div>`:''}
+    <div class="m">Printed ${counts[j.id]||0}×</div>
+    <div class="a"><button class="btn sm" data-re="${j.id}">↻ Reprinted</button>
+      <button class="btn sec sm" data-ed="${j.id}">Edit</button><button class="btn dg sm" data-del="${j.id}">✕</button></div></div>`).join('');
+  $('#f-job').innerHTML='<option value="">— pick a saved job or type below —</option>'+jobs.map(j=>`<option value="${j.id}">${esc(j.name)} (${hrs(j.hours)} h)</option>`).join('');
+}
+$('#jobs-grid').onclick=ev=>{const b=ev.target.closest('button');if(!b)return;
+  if(b.dataset.re){const j=S.jobs.find(x=>x.id===b.dataset.re);
+    S.entries.push({id:uid(),date:today(),jobId:j.id,name:j.name,hours:j.hours,grams:j.grams||0,qty:1,notes:'',paid:false});save();toast(`Logged "${j.name}" for today`)}
+  if(b.dataset.del){if(confirm('Delete this saved job? (Logged prints are kept.)')){S.jobs=S.jobs.filter(x=>x.id!==b.dataset.del);save()}}
+  if(b.dataset.ed){const j=S.jobs.find(x=>x.id===b.dataset.ed);
+    openDlg('Edit job',`<div class="field"><label>Name</label><input id="d-name" value="${esc(j.name)}"></div>
+      <div class="row" style="margin-top:8px"><div class="field"><label>Default hours</label><input type="number" step="0.25" id="d-hours" value="${j.hours}"></div>
+      <div class="field"><label>Filament (g)</label><input type="number" id="d-grams" value="${j.grams||0}"></div></div>
+      <div class="field" style="margin-top:8px"><label>Notes</label><input id="d-notes" value="${esc(j.notes||'')}"></div>`,
+      ()=>{j.name=$('#d-name').value.trim()||j.name;j.hours=parseFloat($('#d-hours').value)||0;j.grams=parseFloat($('#d-grams').value)||0;j.notes=$('#d-notes').value.trim();
+        S.entries.forEach(e=>{if(e.jobId===j.id)e.name=j.name});save()})}
+};
+
+// ---------- report ----------
+function monthRange(off){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()+off);const y=d.getFullYear(),m=d.getMonth();
+  const last=new Date(y,m+1,0).getDate();const p=n=>String(n).padStart(2,'0');return [`${y}-${p(m+1)}-01`,`${y}-${p(m+1)}-${p(last)}`]}
+function setRange([a,b]){$('#r-from').value=a;$('#r-to').value=b;render()}
+$('#b-thismonth').onclick=()=>setRange(monthRange(0));
+$('#b-lastmonth').onclick=()=>setRange(monthRange(-1));
+$('#b-alltime').onclick=()=>setRange(['','']);
+['#r-from','#r-to','#r-status'].forEach(s=>$(s).onchange=render);
+function reportList(){const a=$('#r-from').value,b=$('#r-to').value,st=$('#r-status').value;
+  return S.entries.filter(e=>(!a||e.date>=a)&&(!b||e.date<=b)&&(st==='all'||(st==='paid'?e.paid:!e.paid))).sort((x,y)=>x.date.localeCompare(y.date))}
+function renderReport(){const l=reportList();
+  const h=l.reduce((s,e)=>s+e.hours*(e.qty||1),0),g=l.reduce((s,e)=>s+(e.grams||0)*(e.qty||1),0),t=l.reduce((s,e)=>s+amount(e),0);
+  $('#r-count').textContent=l.reduce((s,e)=>s+(e.qty||1),0);$('#r-hours').textContent=hrs(h);$('#r-hours-d').textContent=money(h*S.settings.rate)+' machine time';
+  $('#r-grams').textContent=Math.round(g)+' g';$('#r-grams-d').textContent=money(g*S.settings.gram)+' material';$('#r-total').textContent=money(t);
+  $('#r-empty').style.display=l.length?'none':'';
+  $('#r-body').innerHTML=l.map(e=>`<tr><td>${fmtDate(e.date)}</td><td>${esc(e.name)}</td><td class="num">${e.qty||1}</td><td class="num">${hrs(e.hours)}</td><td class="num">${e.grams?e.grams+' g':'—'}</td><td class="num">${money(amount(e))}</td><td>${e.paid?'<span class="tag ok">Paid</span>':'<span class="tag pend">Unpaid</span>'}</td></tr>`).join('');
+}
+$('#b-markpaid').onclick=()=>{const l=reportList().filter(e=>!e.paid);if(!l.length)return toast('Nothing unpaid in range');
+  if(!confirm(`Mark ${l.length} print(s) totaling ${money(l.reduce((s,e)=>s+amount(e),0))} as reimbursed?`))return;
+  l.forEach(togglePaid);save();toast('Marked as reimbursed')};
+$('#b-csv').onclick=()=>{const l=reportList();
+  const rows=[['Date','Print','Qty','Hours','Filament (g)','Hourly rate','Filament $/g','Amount','Status','Notes']];
+  l.forEach(e=>rows.push([e.date,e.name,e.qty||1,e.hours,e.grams||0,S.settings.rate,S.settings.gram,(Math.round(amount(e)*100)/100).toFixed(2),e.paid?'Reimbursed':'Unpaid',e.notes||'']));
+  rows.push([]);rows.push(['TOTAL','',l.reduce((s,e)=>s+(e.qty||1),0),hrs(l.reduce((s,e)=>s+e.hours*(e.qty||1),0)),'','','',(Math.round(l.reduce((s,e)=>s+amount(e),0)*100)/100).toFixed(2)]);
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  dl(`print-hours-${$('#r-from').value||'start'}_${$('#r-to').value||'now'}.csv`,csv,'text/csv')};
+$('#b-copy').onclick=()=>{const l=reportList();const p=S.settings.printer?` (${S.settings.printer})`:'';
+  const txt=`3D printer reimbursement${p}\nPeriod: ${$('#r-from').value||'start'} to ${$('#r-to').value||'now'}\n\n`+
+    l.map(e=>`${e.date}  ${e.name}${(e.qty||1)>1?' x'+e.qty:''}  ${hrs(e.hours)} h${e.grams?', '+e.grams+' g':''}  ${money(amount(e))}`).join('\n')+
+    `\n\nHours: ${hrs(l.reduce((s,e)=>s+e.hours*(e.qty||1),0))} @ ${money(S.settings.rate)}/h\nFilament: ${Math.round(l.reduce((s,e)=>s+(e.grams||0)*(e.qty||1),0))} g @ ${money(S.settings.gram)}/g\nTOTAL DUE: ${money(l.reduce((s,e)=>s+amount(e),0))}`;
+  navigator.clipboard.writeText(txt).then(()=>toast('Copied'))};
+
+// ---------- settings ----------
+$('#b-savesettings').onclick=()=>{S.settings.rate=parseFloat($('#s-rate').value)||0;S.settings.gram=parseFloat($('#s-gram').value)||0;S.settings.printer=$('#s-printer').value.trim();save();toast('Saved')};
+$('#b-export').onclick=()=>dl(`print-hours-backup-${today()}.json`,JSON.stringify(S,null,2),'application/json');
+$('#b-import').onclick=()=>$('#f-import').click();
+$('#f-import').onchange=ev=>{const f=ev.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.entries||!d.jobs)throw 0;
+    if(!confirm(`Import ${d.entries.length} entries and ${d.jobs.length} jobs? This replaces current data.`))return;S=d;save();toast('Imported')}catch(e){toast('Invalid backup file')}};
+  r.readAsText(f);ev.target.value=''};
+$('#b-wipe').onclick=()=>{if(confirm('Erase ALL data? Export a backup first!')&&confirm('Really erase everything?')){localStorage.removeItem(KEY);S=load();save()}};
+function dl(name,content,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+
+// ---------- dialog ----------
+function openDlg(title,html,onOk){$('#d-title').textContent=title;$('#d-body').innerHTML=html;$('#dlg').showModal();
+  $('#d-ok').onclick=()=>{onOk();$('#dlg').close()};$('#d-cancel').onclick=()=>$('#dlg').close()}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+// ---------- render ----------
+function render(){
+  const all=S.entries,unpaid=all.filter(e=>!e.paid),paid=all.filter(e=>e.paid);
+  const sum=(l,f)=>l.reduce((s,e)=>s+f(e),0);const H=e=>e.hours*(e.qty||1);
+  const [ma,mb]=monthRange(0);const mon=all.filter(e=>e.date>=ma&&e.date<=mb);
+  $('#s-hours').textContent=hrs(sum(all,H));$('#s-prints').textContent=sum(all,e=>e.qty||1)+' prints';
+  $('#s-owed').textContent=money(sum(unpaid,amount));$('#s-owed-h').textContent=hrs(sum(unpaid,H))+' h unpaid';
+  $('#s-month').textContent=hrs(sum(mon,H))+' h';$('#s-month-d').textContent=money(sum(mon,amount));
+  $('#s-paid').textContent=money(sum(paid,amount));$('#s-paid-h').textContent=hrs(sum(paid,H))+' h';
+  $('#s-rate').value=S.settings.rate;$('#s-gram').value=S.settings.gram;$('#s-printer').value=S.settings.printer||'';
+  $('#s-info').textContent=`${all.length} entries · ${S.jobs.length} saved jobs · ${(JSON.stringify(S).length/1024).toFixed(1)} KB stored`;
+  renderJobs();renderLog();renderReport();
+}
+render();
+</script>
+</body>
+</html>
